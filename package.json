@@ -1,0 +1,30 @@
+{
+  "name": "aa-assistant",
+  "private": true,
+  "packageManager": "yarn@4.3.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "yarn --cwd apps/web dev",
+    "dev:worker": "node apps/worker/src/worker.js",
+    "build": "yarn workspaces foreach -pt run build",
+    "lint": "yarn workspaces foreach -pt run lint || true",
+    "dev:queue:host": "cross-env REDIS_URL=redis://localhost:6379 tsx packages/queue/src/index.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.18.0",
+    "dotenv": "^17.2.3",
+    "prisma": "^6.18.0",
+    "tsx": "^4.20.6"
+  },
+  "devDependencies": {
+    "@types/node": "^24.9.1",
+    "bullmq": "^5.61.2",
+    "ioredis": "^5.8.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3",
+    "zod": "^4.1.12"
+  }
+}

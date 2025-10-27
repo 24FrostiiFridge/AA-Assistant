@@ -1,0 +1,196 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  region    String?
+  createdAt DateTime @default(now())
+  users     Membership[]
+  channels  Channel[]
+  contacts  Contact[]
+  threads   Thread[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String?
+  createdAt    DateTime @default(now())
+  orgs         Membership[]
+}
+
+model Membership {
+  userId String
+  orgId  String
+  role   Role
+  user   User         @relation(fields: [userId], references: [id])
+  org    Organization @relation(fields: [orgId], references: [id])
+  @@id([userId, orgId])
+}
+
+enum Role {
+     owner 
+     admin 
+     agent 
+     viewer 
+     }
+
+enum ChannelType { 
+    whatsapp 
+    telegram 
+     }
+
+enum Platform { 
+    WHATSAPP 
+    TELEGRAM
+     }
+
+enum WebhookEventType {
+  MESSAGE
+  DELIVERY
+  STATUS
+     }
+
+enum WebhookStatus {
+  RECEIVED
+  PROCESSED
+  FAILED
+}
+
+enum ThreadStatus { 
+    open 
+    pending 
+    closed 
+     }
+
+enum Direction { 
+    in 
+    out 
+     }
+
+model Channel {
+  id          String       @id @default(cuid())
+  orgId       String
+  type        ChannelType
+  status      String       @default("active")
+  displayName String
+  creds       Json
+  org         Organization @relation(fields: [orgId], references: [id])
+  threads     Thread[]
+}
+
+model Contact {
+  id              String   @id @default(cuid())
+  orgId           String
+  platform        Platform
+  platformUserId  String
+  name            String?
+  phone           String?
+  username        String?
+  tags            Json?
+  lastSeenAt      DateTime?
+  org             Organization @relation(fields: [orgId], references: [id])
+  threads         Thread[]
+  @@index([orgId, phone])
+}
+
+model Thread {
+  id         String        @id @default(cuid())
+  orgId      String
+  channelId  String
+  contactId  String
+  status     ThreadStatus  @default(open)
+  assignedTo String?
+  updatedAt  DateTime      @updatedAt
+  org        Organization  @relation(fields: [orgId], references: [id])
+  channel    Channel       @relation(fields: [channelId], references: [id])
+  contact    Contact       @relation(fields: [contactId], references: [id])
+  messages   Message[]
+  @@index([orgId, status, updatedAt])
+}
+
+model Message {
+  id                 String   @id @default(cuid())
+  orgId              String
+  threadId           String
+  direction          Direction
+  body               String
+  media              Json?
+  platformMessageId  String?
+  platformTimestamp  DateTime?
+  sentAt             DateTime?
+  deliveredAt        DateTime?
+  readAt             DateTime?
+  thread             Thread  @relation(fields: [threadId], references: [id])
+  @@unique([platformMessageId])
+}
+
+model WebhookEvents {
+ id              String   @id @default(cuid())
+
+  // ── Foreign keys / relations ───────────────────────────────
+  orgId           String
+  channelId       String
+
+  // ── Core metadata ──────────────────────────────────────────
+  platform        Platform             // Enum, from your enum table (e.g. TELEGRAM, WHATSAPP)
+  eventType       WebhookEventType     // Enum, not plain String (safer + typed)
+  provider        String?              // Optional raw provider string (for debugging or external logs)
+  externalId      String?              // ID from external system (like WA msg_id, Telegram update_id)
+  idempotencyKey  String   @unique     // Ensures dedupe across retries
+  payload         Json                 // Original webhook body (raw JSON)
+
+  // ── Lifecycle timestamps ───────────────────────────────────
+  receivedAt      DateTime @default(now())
+  processedAt     DateTime?
+  status          WebhookStatus @default(RECEIVED)
+
+  // ── Indexes & constraints ─────────────────────────────────
+  @@index([orgId])
+  @@index([channelId])
+  @@unique([orgId, platform, externalId])
+  @@index([receivedAt])
+  @@index([orgId, platform])
+  @@index([orgId, externalId])
+
+}
+
+model WebhookProcessingState {
+  idempotencyKey String  @id
+  lastAttemptAt  DateTime @default(now())
+  attempts       Int      @default(0)
+  state          String   // 'received' | 'parsed' | 'applied' | 'failed'
+  error          String?
+  updatedAt      DateTime @updatedAt
+}
+
+model Outbox {
+  id            String   @id @default(cuid())
+  orgId         String
+  channelId     String
+  threadId      String
+  payload       Json
+  attempts      Int      @default(0)
+  nextAttemptAt DateTime?
+  lastError     String?
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  orgId       String
+  actorUserId String?
+  action      String
+  targetType  String
+  targetId    String
+  meta        Json?
+  createdAt   DateTime @default(now())
+}

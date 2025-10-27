@@ -1,0 +1,9 @@
+{
+  "name": "@aa/config",
+  "version": "0.0.0",
+  "main": "src/env.ts",
+  "type": "module",
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
